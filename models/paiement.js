@@ -16,7 +16,6 @@ const paiementSchema = new mongoose.Schema({
   moyen: { 
     type: String, 
     enum: ['espèces', 'carte', 'virement'], 
-    required: true 
   },
   utilisateurId: {
   type: mongoose.Schema.Types.ObjectId,
@@ -24,12 +23,15 @@ const paiementSchema = new mongoose.Schema({
   required: true
 },
 
-  description: { type: String , required: true },
+  description: { type: String },
   faculte: {
     type: String,
     required: false, // Rendons-le optionnel pour le test
     trim: true,
     default: 'Non spécifiée' // Valeur par défaut explicite
+  },
+  pieceJoint:{
+    type:String
   }
 }, { 
   versionKey: false, // Désactive le champ __v

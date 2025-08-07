@@ -1,11 +1,10 @@
 const User = require('./models/user');
 const bcrypt = require('bcrypt');
-
+const Etudiant = require('./models/etudiant');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const Paiement = require('./models/paiement');
-
 const app = express();
 const PORT = 3000;
 
@@ -31,6 +30,33 @@ app.get('/paiements', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// Route pour récupérer tous les étudiants
+app.get('/etudiants', async (req, res) => {
+  try {
+    const etudiants = await Etudiant.find();
+    console.log(etudiants);
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur récupération étudiants:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour récupérer les étudiants par faculté
+app.get('/etudiants/faculte/:faculte', async (req, res) => {
+  try {
+    const etudiants = await Etudiant.find({ 
+      faculte: req.params.faculte 
+    }).sort({ nom: 1, prenom: 1 });
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur récupération étudiants par faculté:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Route pour obtenir un paiement spécifique (à ajouter)
 // Route GET pour un paiement spécifique (à ajouter/modifier)
@@ -78,14 +104,31 @@ app.put('/paiements/:id', async (req, res) => {
 });
 
 
-app.post('/paiements', async (req, res) => {
-  try {
-    const { client, montant, moyen, description, faculte, utilisateurId } = req.body;
+const multer = require('multer');
 
-    // Vérification minimale
-    if (!utilisateurId) {
-      return res.status(400).json({ message: 'utilisateurId manquant' });
-    }
+// Configuration Multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+const upload = multer({ storage: storage });
+
+// Route POST avec pièce jointe facultative
+app.post('/paiements', upload.single('pieceJoint'), async (req, res) => {
+  try {
+    const {
+      client,
+      montant,
+      moyen,
+      description,
+      faculte,
+      etudiantId,
+      utilisateurId
+    } = req.body;
 
     const nouveauPaiement = new Paiement({
       client,
@@ -93,20 +136,16 @@ app.post('/paiements', async (req, res) => {
       moyen,
       description,
       faculte,
-      utilisateurId
+      etudiantId,
+      utilisateurId,
+      pieceJoint: req.file ? `uploads/${req.file.filename}` : null // facultatif ici
     });
 
-    const saved = await nouveauPaiement.save();
-    console.log('Paiement sauvegardé:', saved); // Log le résultat
-    res.status(201).json(saved);
-  } catch (err) {
-    console.error('Erreur de sauvegarde:', err); // Log détaillé
-    res.status(400).json({ 
-      error: err.message,
-      stack: err.stack,
-       // Ajoutez la stack trace pour le débogage
-       errors: err.errors
-    });
+    await nouveauPaiement.save();
+    res.status(201).json(nouveauPaiement);
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du paiement :", error);
+    res.status(400).json({ message: "Erreur lors de l'ajout du paiement", error });
   }
 });
 // Enregistrement d'un utilisateur
@@ -167,6 +206,36 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.put('/api/auth/change-password/:userId', async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.params.userId;
+
+    // Récupérer l'utilisateur
+    const user = await User.findById(userId).select('+password');
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Vérifier l'ancien mot de passe
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Ancien mot de passe incorrect' });
+    }
+
+    // Hasher le nouveau mot de passe
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+
+    // Sauvegarder le nouveau mot de passe
+    await user.save();
+
+    res.status(200).json({ message: 'Mot de passe mis à jour avec succès' });
+  } catch (err) {
+    console.error('[Erreur changement mdp]', err);
+    res.status(500).json({ message: 'Erreur lors du changement de mot de passe', error: err.message });
+  }
+});
 
 // Nouvelle route pour les paiements récents
 // Ajoutez cette route spécifique
@@ -192,7 +261,8 @@ app.get('/paiements/utilisateur/:userId', async (req, res) => {
   }
 });
 
-// GET paiements d’un utilisateur
+
+
 
 
 
