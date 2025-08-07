@@ -13,10 +13,11 @@ const paiementSchema = new mongoose.Schema({
   client: { type: String, required: true },
   montant: { type: Number, required: true },
   date: { type: Date, default: Date.now },
-  moyen: { 
-    type: String, 
-    enum: ['espèces', 'carte', 'virement'], 
-  },
+  moyen: {
+  type: String,
+  enum: ['espece', 'cheque', 'virement', 'carte'],
+  required: true
+},
   utilisateurId: {
   type: mongoose.Schema.Types.ObjectId,
   ref: 'User',
